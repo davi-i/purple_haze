@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Chat App</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+    }
+
+    #messageInput {
+      width: 400px;
+      margin-top: 10px;
+    }
+
+    #chatBox {
+      width: 400px;
+      height: 300px;
+      overflow-y: scroll;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Chat App</h1>
+  <div>
+    <h2>Register</h2>
+    <label for="registerUsername">Username:</label>
+    <input type="text" id="registerUsername" /><br />
+    <label for="registerPassword">Password:</label>
+    <input type="password" id="registerPassword" /><br />
+    <button onclick="registerUser()">Register</button>
+  </div>
+  <div>
+    <h2>Login</h2>
+    <label for="loginUsername">Username:</label>
+    <input type="text" id="loginUsername" /><br />
+    <label for="loginPassword">Password:</label>
+    <input type="password" id="loginPassword" /><br />
+    <button onclick="loginUser()">Login</button>
+  </div>
+  <div id="chatSection" style="display: none;">
+    <h2>Chat</h2>
+    <h3>You are in <span id="room">lobby</span></h3>
+    <div id="chatBox"></div>
+    <input type="text" id="messageInput" /><br />
+    <button onclick="sendMessage()">Send</button>
+
+    <h2>Games</h2>
+    <div id="gameList"></div>
+    <input type="text" id="gameName" /><br />
+    <input type="text" id="password" /><br />
+    <button onClick="createGame()">Create game</button>
+    <button onClick="joinGame()">Join game</button>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const serverUrl = 'http://localhost:3000';
+    function getCookie(name) {
+      let value = `; ${document.cookie}`;
+      let parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+    // // console.log(getCookie('token'));
+    // const serverUrl = 'http://localhost:3000';
+
+    // Register a new user
+    async function registerUser() {
+      const username = document.getElementById('registerUsername').value;
+      const password = document.getElementById('registerPassword').value;
+      try {
+        await axios.post(`${serverUrl}/register`, {username, password});
+        console.log('Registration successful');
+      } catch (error) {
+        console.error('Error occurred while registering:', error);
+      }
+    }
+
+    // Login and save the token in a cookie
+    async function loginUser() {
+      const username = document.getElementById('loginUsername').value;
+      const password = document.getElementById('loginPassword').value;
+      try {
+        const response = await axios.post(`${serverUrl}/login`, {username, password});
+        const token = response.data.token;
+        document.cookie = `token=${token}; path=/`; // Save the token in a cookie
+        console.log('Login successful');
+        startChat();
+      } catch (error) {
+        console.error('Error occurred while logging in:', error);
+      }
+    }
+
+    let socket;
+
+    // Start the chat functionality
+    function startChat() {
+      socket = io({
+        auth: {
+          token: getCookie('token')
+        }
+      });
+
+
+      socket.on("connect_error", (err) => {
+        console.log(err.message); // prints the message associated with the error
+      });
+
+      socket.on("error", (err) => {
+        console.log(err.message); // prints the message associated with the error
+      });
+
+      socket.on('connect', () => {
+        console.log('Connected to the server');
+        document.getElementById('chatSection').style.display = 'block';
+      });
+
+      socket.on('chat', (data) => {
+        const chatBox = document.getElementById('chatBox');
+        const message = document.createElement('p');
+        message.textContent = data;
+        chatBox.appendChild(message);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      });
+
+      socket.on('games', (games) => {
+        for (let game of games) {
+          const gameList = document.getElementById('gameList');
+          const message = document.createElement('p');
+          message.textContent = game;
+          gameList.appendChild(message);
+        }
+      });
+    }
+
+    // Send a chat message
+    function sendMessage() {
+      const messageInput = document.getElementById('messageInput');
+      const message = messageInput.value;
+      socket.emit('chat', message);
+      messageInput.value = '';
+    }
+
+    function createGame() {
+      const name = document.getElementById('gameName').value;
+      const password = document.getElementById('password').value;
+      socket.emit('createGame', {name, password}, (data) => {
+        if (data.result == 'created') {
+          document.getElementById('room').innerHTML = "game " + name;
+        } else {
+          alert(data.reason);
+        }
+      });
+    }
+    function joinGame() {
+      const name = document.getElementById('gameName').value;
+      const password = document.getElementById('password').value;
+      socket.emit('joinGame', {name, password}, (data) => {
+        console.log(data);
+        if (data.result == 'joined') {
+          document.getElementById('room').innerHTML = "game " + name;
+        } else {
+          alert(data.reason);
+        }
+      });
+    }
+  //</script>
+</body>
+
+</html>
