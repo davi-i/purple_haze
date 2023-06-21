@@ -1,43 +1,50 @@
 import { Request, Response } from "express";
-import pgPromise from "pg-promise";
 import jwt from 'jsonwebtoken';
-import dotenv from 'dotenv';
+import bcrypt from 'bcrypt';
+import { db } from "./database";
+import { User, WithId, WithPassword } from "./types";
 
-dotenv.config();
-
-const pgp = pgPromise();
-const db = pgp(process.env.DATABASE_URL || '');
 
 export const registerUser = async (req: Request, res: Response) => {
-  const { username, password } = req.body;
-  // You should validate and sanitize the input data here
+  const { email, username, password } = req.body;
 
-  // Save the user to the database
+  // TODO: validate email format and uniqueness
+  // TODO: validate username format(?) and uniquess
+
+  if (!email || !username || !password) {
+    res.status(500).json({ message: 'email, username and password are required' });
+    return;
+  }
+
   try {
-    await db.none('INSERT INTO users(username, password) VALUES($1, $2)', [username, password]);
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    await db.none('INSERT INTO users(email, username, password) VALUES($1, $2, $3)', [email, username, hashedPassword]);
     res.status(201).json({ message: "user registered" });
   } catch (error) {
     console.error('Error occurred while registering user:', error);
-    res.sendStatus(500);
+    res.status(500).json({ message: 'internal error' });
   }
 }
 
 export const login = async (req: Request, res: Response) => {
   const { username, password } = req.body;
-  // You should validate and sanitize the input data here
 
-  // Check if the user exists in the database
   try {
-    const user = await db.oneOrNone('SELECT * FROM users WHERE username = $1', [username]);
-    if (user && user.password === password) {
-      // Generate JWT token
-      const token = jwt.sign({ username }, process.env.JWT_SECRET_KEY || '');
+    const user: WithId<WithPassword<User>> | null = await db.oneOrNone('SELECT * FROM users WHERE username = $1', [username]);
+    const isMatch = user && await bcrypt.compare(password, user.password);
+    if (isMatch) {
+      const token = jwt.sign(
+        { id: user.id, email: user.email, username },
+        process.env.JWT_SECRET_KEY || ''
+      );
       res.json({ message: "logged in successfully", token });
     } else {
-      res.sendStatus(401); // Unauthorized
+      res.status(401).json({ message: 'username or password are wrong' });
     }
   } catch (error) {
     console.error('Error occurred while logging in:', error);
-    res.sendStatus(500);
+    res.status(500).json({ message: 'internal error' });
   }
 };

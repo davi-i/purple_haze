@@ -1,13 +1,18 @@
 import { Server } from "socket.io";
 
-export type User = { username: string, iat: number };
+export type WithPassword<T> = T & { password: string };
+export type WithId<T> = T & { id: number };
 
-type Game = string;
-export type Games = Map<string, Game>;
+export type User = { email: string, username: string };
+export type Game = {
+  name: string,
+};
 
 interface ServerToClientEvents {
   chat: (message: string) => void,
-  games: (games: string[]) => void,
+  games: (games: Game[]) => void,
+  newAdmin: (username: string) => void,
+  promoted: () => void,
 }
 
 interface GameRoom {
@@ -24,9 +29,12 @@ interface ClientToServerEvents {
   leaveGame: () => void,
 }
 
+export type Room = 'lobby' | `game${string}`;
+
 interface SocketData {
-  room: 'lobby' | `game${string}`,
-  user: User,
+  room: Room,
+  user: WithId<User>,
+  isCreator: boolean,
 }
 
 export type GameServer = Server<ClientToServerEvents, ServerToClientEvents, never, SocketData>;

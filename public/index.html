@@ -29,6 +29,8 @@
   <h1>Chat App</h1>
   <div>
     <h2>Register</h2>
+    <label for="registerEmail">Email:</label>
+    <input type="email" id="registerEmail" /><br />
     <label for="registerUsername">Username:</label>
     <input type="text" id="registerUsername" /><br />
     <label for="registerPassword">Password:</label>
@@ -70,10 +72,11 @@
 
     // Register a new user
     async function registerUser() {
+      const email = document.getElementById('registerEmail').value;
       const username = document.getElementById('registerUsername').value;
       const password = document.getElementById('registerPassword').value;
       try {
-        await axios.post(`${serverUrl}/register`, {username, password});
+        await axios.post(`${serverUrl}/register`, {email, username, password});
         console.log('Registration successful');
       } catch (error) {
         console.error('Error occurred while registering:', error);
@@ -96,6 +99,10 @@
     }
 
     let socket;
+
+    if (getCookie('token')) {
+      startChat();
+    }
 
     // Start the chat functionality
     function startChat() {
@@ -131,7 +138,7 @@
         for (let game of games) {
           const gameList = document.getElementById('gameList');
           const message = document.createElement('p');
-          message.textContent = game;
+          message.textContent = game.name;
           gameList.appendChild(message);
         }
       });
@@ -168,7 +175,7 @@
         }
       });
     }
-  //</script>
+  </script>
 </body>
 
 </html>

@@ -1,11 +1,17 @@
 import jwt from 'jsonwebtoken';
-import { Games, GameServer } from './types';
+import { Game, GameServer, Room } from './types';
 import { Server } from 'socket.io';
-
-let games: Games = new Map();
+import { db } from './database';
 
 export const startSocketIo = (server: any) => {
   const io: GameServer = new Server(server);
+
+  const emitGames = async () => {
+    const games: Game[] = await db.manyOrNone(
+      "SELECT name FROM games"
+    );
+    io.to('lobby').emit('games', games);
+  }
 
   io.use((socket, next) => {
     console.log('Trying to connect');
@@ -35,35 +41,40 @@ export const startSocketIo = (server: any) => {
       }
     });
 
-    socket.on("createGame", ({ name, password }, ack) => {
-      if (games.has(name)) {
+    socket.on("createGame", async ({ name, password }, ack) => {
+      const game = await db.oneOrNone("SELECT * FROM games WHERE name = $1", [name]);
+      if (game) {
         ack({ result: 'error', reason: 'game with this name already exists' });
       } else {
         if (socket.data.room) {
           socket.leave(socket.data.room);
         }
         socket.join('game' + name);
-        socket.data.room = `game${name}`;
+        socket.data.isCreator = true;
 
-        games.set(name, password);
-
-        io.to('lobby').emit('games', Array.from(games.keys()));
+        await db.none(
+          'INSERT INTO games(name, password, creator_id) VALUES($1, $2, $3)',
+          [name, password, socket.data.user?.id]
+        );
+        emitGames();
 
         ack({ result: 'created' });
       }
     });
 
-    socket.on("joinGame", ({ name, password }, ack) => {
-      if (!games.has(name)) {
+    socket.on("joinGame", async ({ name, password }, ack) => {
+      const game = await db.oneOrNone("SELECT * FROM games WHERE name = $1", [name]);
+      if (!game) {
         ack({ result: 'error', reason: 'game does not exist' });
-      } else if (games.get(name) != password) {
+      } else if (game.password != password) {
         ack({ result: 'error', reason: 'wrong password' });
       } else {
         if (socket.data.room) {
           socket.leave(socket.data.room);
         }
         socket.join('game' + name);
-        socket.data.room = `game${name}`;
+
+        emitGames();
 
         ack({ result: 'joined' });
       }
@@ -73,13 +84,48 @@ export const startSocketIo = (server: any) => {
       if (socket.data.room && socket.data.room != 'lobby') {
         socket.leave(socket.data.room);
       }
-    })
-
-    io.of('/').adapter.on("delete-room", (room: string) => {
-      if (room.startsWith('game')) {
-        games.delete(room.slice(4));
-        io.to('lobby').emit('games', Array.from(games.keys()));
-      }
+      socket.data.isCreator = false;
     });
+
+  });
+
+  io.of('/').adapter.on("join-room", (room: Room, id: string) => {
+    const socket = io.of('/').sockets.get(id)!;
+    console.log(socket.data.user?.username, "joined room", room);
+    socket.data.room = room;
+  });
+
+
+  io.of('/').adapter.on("leave-room", async (room: string, id: string) => {
+    const socket = io.of('/').sockets.get(id)!;
+    console.log(socket.data.user?.username, "left room", room);
+    if (room.startsWith('game')) {
+      socket.join('lobby');
+      if (!socket.data.isCreator) {
+        return;
+      }
+      const ids = io.of('/').adapter.rooms.get(room)?.keys();
+      let next = ids?.next();
+      if (next && !next.done) {
+        const sid = next.value;
+        const socket = io.of('/').sockets.get(sid)!;
+        socket.data.isCreator = true;
+        const user = socket.data.user!;
+        await db.none(
+          "UPDATE games SET creator_id = $1 WHERE name = $2",
+          [user.id, room.slice(4)]
+        );
+        socket.emit('promoted');
+        socket.broadcast.to(room).emit('newAdmin', user.username);
+      }
+    }
+  });
+
+  io.of('/').adapter.on("delete-room", async (room: string) => {
+    console.log("deleted room", room);
+    if (room.startsWith('game')) {
+      await db.none('DELETE FROM games WHERE name = $1', [room.slice(4)]);
+      emitGames();
+    }
   });
 }
