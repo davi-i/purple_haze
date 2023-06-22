@@ -37,7 +37,10 @@ export const startSocketIo = (server: any) => {
 
     socket.on("chat", (message) => {
       if (socket.data.room) {
-        io.to(socket.data.room).emit("chat", message);
+        io.to(socket.data.room).emit("chat", {
+          username: socket.data.user!.username,
+          message,
+        });
       }
     });
 

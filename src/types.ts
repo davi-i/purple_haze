@@ -8,8 +8,13 @@ export type Game = {
   name: string,
 };
 
+export type Chat = {
+  username: string,
+  message: string,
+}
+
 interface ServerToClientEvents {
-  chat: (message: string) => void,
+  chat: (message: Chat) => void,
   games: (games: Game[]) => void,
   newAdmin: (username: string) => void,
   promoted: () => void,

@@ -22,6 +22,10 @@
       padding: 10px;
       margin-top: 10px;
     }
+
+    .username {
+      font-weight: bold;
+    }
   </style>
 </head>
 
@@ -129,7 +133,12 @@
       socket.on('chat', (data) => {
         const chatBox = document.getElementById('chatBox');
         const message = document.createElement('p');
-        message.textContent = data;
+        const username = document.createElement('span');
+        const messageText = document.createTextNode(data.message);
+        username.classList.add('username');
+        username.textContent = data.username + ": ";
+        message.appendChild(username);
+        message.appendChild(messageText);
         chatBox.appendChild(message);
         chatBox.scrollTop = chatBox.scrollHeight;
       });
