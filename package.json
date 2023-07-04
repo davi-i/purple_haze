@@ -1,9 +1,10 @@
 {
-  "name": "jump_guys",
+  "name": "purple_haze",
   "version": "1.0.0",
-  "description": "Server for jump guys game",
+  "description": "Server for purple haze game",
   "main": "src/server.js",
   "scripts": {
+    "start": "npx ts-node src/server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -13,6 +14,7 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.0",
+    "matter-js": "^0.19.0",
     "pg": "^8.11.0",
     "pg-promise": "^11.5.0",
     "socket.io": "^4.6.2",
@@ -24,6 +26,7 @@
     "@types/bcrypt": "^5.0.0",
     "@types/express": "^4.17.17",
     "@types/jsonwebtoken": "^9.0.2",
+    "@types/matter-js": "^0.18.5",
     "@types/uuid": "^9.0.2"
   }
 }

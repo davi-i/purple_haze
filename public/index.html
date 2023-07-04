@@ -2,7 +2,7 @@
 <html>
 
 <head>
-  <title>Chat App</title>
+  <title>Purple Haze</title>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <style>
     body {
@@ -26,53 +26,59 @@
     .username {
       font-weight: bold;
     }
+
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 
 <body>
-  <h1>Chat App</h1>
-  <div>
-    <h2>Register</h2>
-    <label for="registerEmail">Email:</label>
-    <input type="email" id="registerEmail" /><br />
-    <label for="registerUsername">Username:</label>
-    <input type="text" id="registerUsername" /><br />
-    <label for="registerPassword">Password:</label>
-    <input type="password" id="registerPassword" /><br />
-    <button onclick="registerUser()">Register</button>
-  </div>
-  <div>
-    <h2>Login</h2>
-    <label for="loginUsername">Username:</label>
-    <input type="text" id="loginUsername" /><br />
-    <label for="loginPassword">Password:</label>
-    <input type="password" id="loginPassword" /><br />
-    <button onclick="loginUser()">Login</button>
-  </div>
-  <div id="chatSection" style="display: none;">
-    <h2>Chat</h2>
-    <h3>You are in <span id="room">lobby</span></h3>
-    <div id="chatBox"></div>
-    <input type="text" id="messageInput" /><br />
-    <button onclick="sendMessage()">Send</button>
+  <h1>Purple Haze</h1>
+  <div id="pre-game">
+    <div>
+      <h2>Register</h2>
+      <label for="registerEmail">Email:</label>
+      <input type="email" id="registerEmail" /><br />
+      <label for="registerUsername">Username:</label>
+      <input type="text" id="registerUsername" /><br />
+      <label for="registerPassword">Password:</label>
+      <input type="password" id="registerPassword" /><br />
+      <button onclick="registerUser()">Register</button>
+    </div>
+    <div>
+      <h2>Login</h2>
+      <label for="loginUsername">Username:</label>
+      <input type="text" id="loginUsername" /><br />
+      <label for="loginPassword">Password:</label>
+      <input type="password" id="loginPassword" /><br />
+      <button onclick="loginUser()">Login</button>
+    </div>
+    <div id="chatSection" class="hidden">
+      <h2>Chat</h2>
+      <h3>You are in <span id="room">lobby</span></h3>
+      <div id="chatBox"></div>
+      <input type="text" id="messageInput" /><br />
+      <button onclick="sendMessage()">Send</button>
 
-    <h2>Games</h2>
-    <div id="gameList"></div>
-    <input type="text" id="gameName" /><br />
-    <input type="text" id="password" /><br />
-    <button onClick="createGame()">Create game</button>
-    <button onClick="joinGame()">Join game</button>
+      <h2>Games</h2>
+      <div id="gameList"></div>
+      <input type="text" id="gameName" /><br />
+      <input type="text" id="password" /><br />
+      <input type="checkbox" id="canEnter" /> Can join after start
+      <button onClick="createGame()">Create game</button>
+      <button onClick="joinGame()">Join game</button>
+      <button id="startGame" class="hidden" onclick="startGame()">Start game</button>
+    </div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const serverUrl = 'http://localhost:3000';
+    const serverUrl = 'http://10.51.106.34:3000';
     function getCookie(name) {
       let value = `; ${document.cookie}`;
       let parts = value.split(`; ${name}=`);
       if (parts.length === 2) return parts.pop().split(';').shift();
     }
-    // // console.log(getCookie('token'));
-    // const serverUrl = 'http://localhost:3000';
 
     // Register a new user
     async function registerUser() {
@@ -103,13 +109,23 @@
     }
 
     let socket;
+    let user;
 
     if (getCookie('token')) {
       startChat();
     }
 
+    function getUserData() {
+      const [header, payloadBase64, signature] = getCookie('token').split('.');
+
+      const payload = JSON.parse(atob(payloadBase64));
+
+      return payload;
+    }
+
     // Start the chat functionality
     function startChat() {
+      user = getUserData();
       socket = io({
         auth: {
           token: getCookie('token')
@@ -118,16 +134,16 @@
 
 
       socket.on("connect_error", (err) => {
-        console.log(err.message); // prints the message associated with the error
+        console.error(err.message); // prints the message associated with the error
       });
 
       socket.on("error", (err) => {
-        console.log(err.message); // prints the message associated with the error
+        console.error(err.message); // prints the message associated with the error
       });
 
       socket.on('connect', () => {
         console.log('Connected to the server');
-        document.getElementById('chatSection').style.display = 'block';
+        document.getElementById('chatSection').classList.remove('hidden');
       });
 
       socket.on('chat', (data) => {
@@ -146,10 +162,201 @@
       socket.on('games', (games) => {
         for (let game of games) {
           const gameList = document.getElementById('gameList');
+          gameList.innerHTML = '';
           const message = document.createElement('p');
           message.textContent = game.name;
           gameList.appendChild(message);
         }
+      });
+
+      socket.on('promoted', () => {
+        document.getElementById('startGame')?.classList.remove("hidden");
+      });
+
+      socket.on('startGame', (objects) => {
+        document.getElementById('pre-game').classList.add('hidden');
+        const canvas = document.createElement('canvas'),
+          ctx = canvas.getContext('2d');
+
+        canvas.width = 800;
+        canvas.height = 600;
+
+        document.body.appendChild(canvas);
+
+        let players = objects.players;
+        let enemies = [];
+
+        socket.on('objects', (objects) => {
+          players = objects.players;
+          enemies = objects.enemies;
+        });
+
+        let showSword = false;
+
+        let renderAnimation;
+
+        const render = () => {
+          const renderHealth = (health, centerX, bottomY) => {
+            const emoji = "❤️".repeat(health);
+            const emojiX = centerX - ctx.measureText(emoji).width / 2;
+            const emojiY = bottomY - textSize / 2;
+            ctx.fillStyle = "#ff0000";
+            ctx.fillText(emoji, emojiX, emojiY);
+          };
+          renderAnimation = window.requestAnimationFrame(render);
+
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+
+          const textSize = 20;
+          ctx.font = `${textSize}px Arial`;
+
+          for (const [username, player] of Object.entries(players)) {
+            const squareSize = 80;
+            const squareX = player.position.x - squareSize / 2;
+            const squareY = player.position.y - squareSize / 2;
+
+            const fillStyle = username == user.username ? '#737' : '#292';
+
+            ctx.fillStyle = fillStyle;
+            if (!player.invincible || Math.floor(Date.now() / 200) % 2 === 0) {
+              ctx.fillRect(squareX, squareY, squareSize, squareSize);
+            }
+
+            if (showSword) {
+              ctx.fillStyle = '#228';
+              let centerX, centerY, startAngle, endAngle;
+              if (player.facing == 'up') {
+                centerX = player.position.x;
+                centerY = player.position.y - squareSize / 2;
+                startAngle = Math.pi;
+                endAngle = 0;
+              } else if (player.facing == 'down') {
+                centerX = player.position.x;
+                centerY = player.position.y + squareSize / 2;
+                startAngle = 0;
+                endAngle = Math.PI;
+              } else if (player.facing == 'left') {
+                centerX = player.position.x - squareSize / 2;
+                centerY = player.position.y;
+                startAngle = Math.PI / 2;
+                endAngle = 3 * Math.PI / 2;
+              } else if (player.facing == 'right') {
+                centerX = player.position.x + squareSize / 2;
+                centerY = player.position.y;
+                startAngle = 3 * Math.PI / 2;
+                endAngle = Math.PI / 2;
+              }
+              ctx.beginPath();
+              ctx.arc(centerX, centerY, (squareSize - 10) / 2, startAngle, endAngle);
+              ctx.closePath();
+              ctx.fill();
+              ctx.fillStyle = fillStyle;
+            }
+
+            const textX = player.position.x - ctx.measureText(username).width / 2;
+            const textY = squareY - textSize / 2;
+            ctx.fillText(username, textX, textY);
+
+            renderHealth(player.health, player.position.x, textY);
+          }
+          for (const enemy of enemies) {
+            const enemySize = 50;
+            const enemyX = enemy.position.x - enemySize / 2;
+            const enemyY = enemy.position.y - enemySize / 2;
+
+            ctx.fillStyle = '#922';
+            ctx.fillRect(enemyX, enemyY, enemySize, enemySize);
+
+            renderHealth(enemy.health, enemy.position.x, enemyY);
+          }
+        }
+
+        let movement = {x: 0, y: 0};
+
+        let keyStates = {};
+        const resetKeys = () => {
+          movement = {x: 0, y: 0};
+          for (const key in keyStates) {
+            keyStates[key] = false;
+          }
+        }
+
+        socket.on('gameOver', (ack) => {
+          resetKeys();
+          if (confirm('Game over! Restart game?')) {
+            ack('restart');
+          } else {
+            window.cancelAnimationFrame(renderAnimation);
+            ack('leave');
+            canvas.remove();
+            document.getElementById('room').innerHTML = "lobby";
+            document.getElementById('startGame').classList.add('hidden');
+            document.getElementById('pre-game').classList.remove('hidden');
+          }
+        });
+
+        document.addEventListener('keydown', function (event) {
+          let keyPressed = event.key.toLowerCase();
+          if (keyStates[keyPressed]) {
+            return;
+          }
+
+          keyStates[keyPressed] = true;
+
+          if (keyPressed == 'w') {
+            movement.y -= 1;
+          } else if (keyPressed == 's') {
+            movement.y += 1;
+          } else if (keyPressed == 'a') {
+            movement.x -= 1;
+          } else if (keyPressed == 'd') {
+            movement.x += 1;
+          } else if (keyPressed == ' ') {
+            socket.emit('attack', (data) => {
+              if (data.result != 'error') {
+                showSword = true;
+                setTimeout(() => showSword = false, data.result.endTime - new Date().getTime());
+              }
+            });
+          }
+        });
+
+        document.addEventListener('mouseleave', (event) => {
+          resetKeys()
+        });
+
+        socket.on('attack_end', () => {
+          showSword = false;
+        });
+
+        document.addEventListener('keyup', function (event) {
+          let keyPressed = event.key.toLowerCase();
+
+          if (keyPressed == 'w') {
+            movement.y += 1;
+          } else if (keyPressed == 's') {
+            movement.y -= 1;
+          } else if (keyPressed == 'a') {
+            movement.x += 1;
+          } else if (keyPressed == 'd') {
+            movement.x -= 1;
+          }
+
+          if (keyStates[keyPressed]) {
+            delete keyStates[keyPressed];
+          }
+        });
+
+        const run = () => {
+          socket.emit('move', movement);
+        }
+
+        setInterval(run, 1000 / 60);
+        render();
       });
     }
 
@@ -164,9 +371,11 @@
     function createGame() {
       const name = document.getElementById('gameName').value;
       const password = document.getElementById('password').value;
-      socket.emit('createGame', {name, password}, (data) => {
+      const canEnterAfterStart = document.getElementById('canEnter').checked;
+      socket.emit('createGame', {name, password, canEnterAfterStart}, (data) => {
         if (data.result == 'created') {
           document.getElementById('room').innerHTML = "game " + name;
+          document.getElementById('startGame').classList.remove("hidden");
         } else {
           alert(data.reason);
         }
@@ -176,14 +385,18 @@
       const name = document.getElementById('gameName').value;
       const password = document.getElementById('password').value;
       socket.emit('joinGame', {name, password}, (data) => {
-        console.log(data);
         if (data.result == 'joined') {
           document.getElementById('room').innerHTML = "game " + name;
-        } else {
+        } else if (data.result == 'error') {
           alert(data.reason);
         }
       });
     }
+
+    function startGame() {
+      socket.emit('startGame');
+    }
+
   </script>
 </body>
 
