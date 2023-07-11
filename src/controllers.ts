@@ -37,7 +37,8 @@ export const login = async (req: Request, res: Response) => {
     if (isMatch) {
       const token = jwt.sign(
         { id: user.id, email: user.email, username },
-        process.env.JWT_SECRET_KEY || ''
+        process.env.JWT_SECRET_KEY || '',
+        { expiresIn: '2h' },
       );
       res.json({ message: "logged in successfully", token });
     } else {

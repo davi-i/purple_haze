@@ -3,6 +3,7 @@ import { db } from "./database";
 import { getPlayersInfos, runningGames, spawnPlayer } from "./game";
 import { io } from "./socketIo";
 import { GameRoom, GameSocket, Room } from "./types";
+import { sanatizeString } from "./utils";
 
 export const getGames = async (): Promise<GameRoom[]> => {
   return await db.manyOrNone(
@@ -10,14 +11,21 @@ export const getGames = async (): Promise<GameRoom[]> => {
   );
 }
 
-const emitGames = async () => {
+const emitGamesAndUsers = async () => {
   const games = await getGames();
+  for (const game of games) {
+    const room: Room = `game${game.name}`;
+    const users = getSockets(room).map((socket) => socket.data.user!.username);
+    io.to(room).emit('users', users);
+  }
   io.to('lobby').emit('games', games);
 }
 
 
 export const setupRooms = (socket: GameSocket) => {
   socket.on("createGame", async ({ name, password, canEnterAfterStart }, ack) => {
+    name = sanatizeString(name);
+    password = sanatizeString(password);
     const game = await db.oneOrNone("SELECT * FROM games WHERE name = $1", [name]);
     if (game) {
       ack({ result: 'error', reason: 'game with this name already exists' });
@@ -31,13 +39,14 @@ export const setupRooms = (socket: GameSocket) => {
         'INSERT INTO games(name, password, can_enter_during_game) VALUES($1, $2, $3)',
         [name, password, canEnterAfterStart]
       );
-      emitGames();
 
       ack({ result: 'created' });
     }
   });
 
   socket.on("joinGame", async ({ name, password }, ack) => {
+    name = sanatizeString(name);
+    password = sanatizeString(password);
     const game = await db.oneOrNone("SELECT * FROM games WHERE name = $1", [name]);
     if (!game) {
       ack({ result: 'error', reason: 'game does not exist' });
@@ -77,12 +86,6 @@ export const setupRoomsForServer = () => {
     const socket = io.of('/').sockets.get(id)!;
     console.log(socket.data.user?.username, "joined room", room);
     socket.data.user!.room = room;
-
-    if (room.startsWith('game')) {
-
-      const users = Array.from(io.of('/').adapter.rooms.get(room) || []);
-      io.to(room).emit('users', users);
-    }
   });
 
   io.of('/').adapter.on("leave-room", async (room: string, id: string) => {
@@ -117,9 +120,10 @@ export const setupRoomsForServer = () => {
         clearInterval(runningGames[room].interval);
         delete runningGames[room];
       }
-      emitGames();
     }
   });
+
+  setInterval(emitGamesAndUsers, 3000);
 }
 
 export const getSockets = (room: Room): GameSocket[] => {

@@ -73,7 +73,7 @@
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const serverUrl = 'http://10.51.106.34:3000';
+    const serverUrl = 'http://localhost:3000';
     function getCookie(name) {
       let value = `; ${document.cookie}`;
       let parts = value.split(`; ${name}=`);
@@ -173,18 +173,34 @@
         document.getElementById('startGame')?.classList.remove("hidden");
       });
 
-      socket.on('startGame', (objects) => {
+      socket.on('startGame', () => {
         document.getElementById('pre-game').classList.add('hidden');
         const canvas = document.createElement('canvas'),
           ctx = canvas.getContext('2d');
 
-        canvas.width = 800;
-        canvas.height = 600;
+        canvas.width = 1000;
+        canvas.height = 1000;
+
+        const SPAWN_AREA = {
+          minX: -5,
+          maxX: 5,
+          minY: -5,
+          maxY: 5,
+        }
+
+        const fixPosition = (position) => {
+          const spawnWidth = SPAWN_AREA.maxX - SPAWN_AREA.minX;
+          const spawnHeight = SPAWN_AREA.maxY - SPAWN_AREA.minY;
+          const x = (position.x - SPAWN_AREA.minX) * (canvas.width / spawnWidth);
+          const y = (position.y - SPAWN_AREA.minY) * (canvas.width / spawnHeight);
+
+          return {x, y}
+        }
 
         document.body.appendChild(canvas);
 
-        let players = objects.players;
-        let enemies = [];
+        let players = {};
+        let enemies = {};
 
         socket.on('objects', (objects) => {
           players = objects.players;
@@ -215,63 +231,83 @@
           ctx.font = `${textSize}px Arial`;
 
           for (const [username, player] of Object.entries(players)) {
-            const squareSize = 80;
-            const squareX = player.position.x - squareSize / 2;
-            const squareY = player.position.y - squareSize / 2;
+            const squareSize = 100;
+            const position = fixPosition(player.position);
+            const square = {x: position.x - squareSize / 2, y: position.y - squareSize / 2};
 
             const fillStyle = username == user.username ? '#737' : '#292';
 
             ctx.fillStyle = fillStyle;
             if (!player.invincible || Math.floor(Date.now() / 200) % 2 === 0) {
-              ctx.fillRect(squareX, squareY, squareSize, squareSize);
+              ctx.fillRect(square.x, square.y, squareSize, squareSize);
             }
 
-            if (showSword) {
-              ctx.fillStyle = '#228';
-              let centerX, centerY, startAngle, endAngle;
-              if (player.facing == 'up') {
-                centerX = player.position.x;
-                centerY = player.position.y - squareSize / 2;
-                startAngle = Math.pi;
-                endAngle = 0;
-              } else if (player.facing == 'down') {
-                centerX = player.position.x;
-                centerY = player.position.y + squareSize / 2;
-                startAngle = 0;
-                endAngle = Math.PI;
-              } else if (player.facing == 'left') {
-                centerX = player.position.x - squareSize / 2;
-                centerY = player.position.y;
-                startAngle = Math.PI / 2;
-                endAngle = 3 * Math.PI / 2;
-              } else if (player.facing == 'right') {
-                centerX = player.position.x + squareSize / 2;
-                centerY = player.position.y;
-                startAngle = 3 * Math.PI / 2;
-                endAngle = Math.PI / 2;
-              }
+            const sword = player.sword;
+            console.log(sword);
+            if (sword) {
+              console.log("sword");
               ctx.beginPath();
-              ctx.arc(centerX, centerY, (squareSize - 10) / 2, startAngle, endAngle);
-              ctx.closePath();
-              ctx.fill();
-              ctx.fillStyle = fillStyle;
-            }
 
-            const textX = player.position.x - ctx.measureText(username).width / 2;
-            const textY = squareY - textSize / 2;
+              var vertices = sword.map((vertex) => fixPosition(vertex));
+
+              ctx.moveTo(vertices[0].x, vertices[0].y);
+
+              for (var j = 1; j < vertices.length; j += 1) {
+                ctx.lineTo(vertices[j].x, vertices[j].y);
+              }
+
+              ctx.lineTo(vertices[0].x, vertices[0].y);
+
+              ctx.lineWidth = 1;
+              ctx.strokeStyle = '#999';
+              ctx.stroke();
+            }
+            // if (showSword) {
+            //   ctx.fillStyle = '#228';
+            //   let centerX, centerY, startAngle, endAngle;
+            //   if (player.facing == 'up') {
+            //     centerX = position.x;
+            //     centerY = position.y - squareSize / 2;
+            //     startAngle = Math.pi;
+            //     endAngle = 0;
+            //   } else if (player.facing == 'down') {
+            //     centerX = position.x;
+            //     centerY = position.y + squareSize / 2;
+            //     startAngle = 0;
+            //     endAngle = Math.PI;
+            //   } else if (player.facing == 'left') {
+            //     centerX = position.x - squareSize / 2;
+            //     centerY = position.y;
+            //     startAngle = Math.PI / 2;
+            //     endAngle = 3 * Math.PI / 2;
+            //   } else if (player.facing == 'right') {
+            //     centerX = position.x + squareSize / 2;
+            //     centerY = position.y;
+            //     startAngle = 3 * Math.PI / 2;
+            //     endAngle = Math.PI / 2;
+            //   }
+            //   ctx.beginPath();
+            //   ctx.arc(centerX, centerY, (squareSize * 0.75) / 2, startAngle, endAngle);
+            //   ctx.closePath();
+            //   ctx.fill();
+            //   ctx.fillStyle = fillStyle;
+            // }
+
+            const textX = position.x - ctx.measureText(username).width / 2;
+            const textY = square.y - textSize / 2;
             ctx.fillText(username, textX, textY);
 
-            renderHealth(player.health, player.position.x, textY);
+            renderHealth(player.health, position.x, textY);
           }
-          for (const enemy of enemies) {
-            const enemySize = 50;
-            const enemyX = enemy.position.x - enemySize / 2;
-            const enemyY = enemy.position.y - enemySize / 2;
+          for (const enemy of Object.values(enemies)) {
+            const squareSize = 100;
+            const position = fixPosition(enemy.position);
+            const square = {x: position.x - squareSize / 2, y: position.y - squareSize / 2};
 
             ctx.fillStyle = '#922';
-            ctx.fillRect(enemyX, enemyY, enemySize, enemySize);
+            ctx.fillRect(square.x, square.y, squareSize, squareSize);
 
-            renderHealth(enemy.health, enemy.position.x, enemyY);
+            renderHealth(enemy.health, position.x, square.y);
           }
         }
 
@@ -319,7 +355,7 @@
             socket.emit('attack', (data) => {
               if (data.result != 'error') {
                 showSword = true;
-                setTimeout(() => showSword = false, data.result.endTime - new Date().getTime());
+                setTimeout(() => showSword = false, data.endTime - new Date().getTime());
               }
             });
           }

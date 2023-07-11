@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { Server } from 'socket.io';
-import { getGames, setupRooms, setupRoomsForServer } from './rooms';
+import { setupRooms, setupRoomsForServer } from './rooms';
 import { GameServer } from './types';
 import { server } from './server';
 import { setupGame } from './game';
@@ -9,6 +9,7 @@ export let io: GameServer;
 
 export const startSocketIo = () => {
   io = new Server(server);
+
   io.use((socket, next) => {
     console.log('Trying to connect');
     const token = socket.handshake.auth.token;
@@ -33,7 +34,6 @@ export const startSocketIo = () => {
     console.log("user", socket.data.user?.username, "connected");
 
     socket.join('lobby');
-    socket.emit('games', await getGames());
 
     socket.on("chat", (message) => {
       if (socket.data.user) {
