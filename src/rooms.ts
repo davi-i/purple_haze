@@ -1,9 +1,10 @@
 import { Composite } from "matter-js";
 import { db } from "./database";
-import { getPlayersInfos, runningGames, spawnPlayer } from "./game";
+import { runningGames } from "./game";
 import { io } from "./socketIo";
 import { GameRoom, GameSocket, Room } from "./types";
 import { sanatizeString } from "./utils";
+import { spawnPlayer } from "./game/players";
 
 export const getGames = async (): Promise<GameRoom[]> => {
   return await db.manyOrNone(
@@ -20,7 +21,6 @@ const emitGamesAndUsers = async () => {
   }
   io.to('lobby').emit('games', games);
 }
-
 
 export const setupRooms = (socket: GameSocket) => {
   socket.on("createGame", async ({ name, password, canEnterAfterStart }, ack) => {
@@ -58,12 +58,13 @@ export const setupRooms = (socket: GameSocket) => {
       ack({ result: 'error', reason: 'wrong password' });
     } else {
       socket.leave(socket.data.user!.room);
-      const room: `game${string}` = `game${name}`;
+      const room: Room = `game${name}`;
       socket.join(room);
 
       if (game.status == 'started') {
+        // game started, need to spawn player and tell him game started
         spawnPlayer(socket);
-        socket.emit('startGame', { players: getPlayersInfos(room) });
+        socket.emit('startGame');
         ack({ result: 'started' });
       } else {
         ack({ result: 'joined' });
@@ -91,14 +92,19 @@ export const setupRoomsForServer = () => {
   io.of('/').adapter.on("leave-room", async (room: string, id: string) => {
     const socket = io.of('/').sockets.get(id)!;
     console.log(socket.data.user?.username, "left room", room);
+
     if (room.startsWith('game')) {
       socket.join('lobby');
+
+      // If player was in a running game, remove him from the world
       if (socket.data.game && runningGames.hasOwnProperty(room)) {
         Composite.remove(runningGames[room].engine.world, socket.data.game.playerWithSword);
       }
       if (!socket.data.user?.isCreator) {
         return;
       }
+
+      // If player was the creator of the room, promote someone else
       const ids = io.of('/').adapter.rooms.get(room)?.keys();
       let next = ids?.next();
       if (next && !next.done) {
@@ -115,7 +121,11 @@ export const setupRoomsForServer = () => {
   io.of('/').adapter.on("delete-room", async (room: string) => {
     console.log("deleted room", room);
     if (room.startsWith('game')) {
+      // when a room is a game, delete it from database
       await db.none('DELETE FROM games WHERE name = $1', [room.slice(4)]);
+
+      // if the game was running, stop the game loop and delete
+      // the information
       if (runningGames.hasOwnProperty(room)) {
         clearInterval(runningGames[room].interval);
         delete runningGames[room];

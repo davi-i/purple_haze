@@ -21,7 +21,8 @@ export type Shop = {
 };
 
 export type Players = { [key: string]: Player };
-export type PlayerInfos = { [key: string]: Info<Player> };
+export type PlayerInfo = Info<Player, 'stuckTimeout'> & { stuck: boolean };
+export type PlayerInfos = { [key: string]: PlayerInfo };
 
 export type FromIds<T> = { [id: number]: T };
 
@@ -37,6 +38,8 @@ interface ServerToClientEvents {
     shoper?: Vector,
     mission?: Vector,
     coins: FromIds<Vector>,
+    boss?: Vector,
+    goo: FromIds<Vector>,
   }) => void,
   users: (users: string[]) => void,
   gameOver: (ack: (response: 'restart' | 'leave') => void) => void,
@@ -48,6 +51,11 @@ interface ServerToClientEvents {
   startLevel: () => void,
   endLevel: () => void,
   coinCollected: (id: number) => void,
+  bossHurt: () => void,
+  bossKilled: () => void,
+  gooDestroyed: (id: number) => void,
+  bossEnraged: () => void,
+  endGame: () => void,
 }
 
 type Ack<Result extends string, Ok = {}, Error = { reason: string }> = (data: { result: Result } & Ok | ({ result: 'error' } & Error)) => void;
@@ -94,6 +102,7 @@ export type Player = {
   invincible: boolean,
   endAttackTime?: number,
   gold: number,
+  stuckTimeout?: ReturnType<typeof setTimeout>,
   upgrades: {
     speed: number,
     maxHealth: number,
@@ -110,14 +119,24 @@ export type Enemy = {
 
 export type EnemyInfo = Info<Enemy, 'targetPlayer'>;
 
+export type Boss = {
+  body: Body,
+  targetPlayer?: Player,
+  stage: number,
+  health: number,
+  speed: number,
+}
+
 export type Game = {
   engine: Engine,
   interval: ReturnType<typeof setInterval>,
   enemies: Enemy[],
   shoper: Body,
   mission: Body,
-  spawnTimer: number,
+  enemySpawnTimer: number,
+  gooSpawnTimer: number,
   level: number,
   levelRunning: boolean,
   enemiesSpawned: number,
+  boss?: Boss,
 };

@@ -19,10 +19,9 @@ export const PLAYER_INITIAL = {
 }
 export const PLAYER_UPGRADES = {
   maxHealth: 1,
-  speed: 0.01,
+  speed: 0.015,
   attack: 0.2,
 }
-
 
 export const itemsPrices = (upgrades: { [item in Upgrade]: number }) => {
   return {
@@ -50,25 +49,39 @@ export const ENEMY_SPAWN_GAP = 3;
 export const ENEMY_SPAWN_INTERVAL = 2000; // ms
 export const INITIAL_ENEMY_HEALTH = 3;
 export const enemyHealth = (level: number) => {
+  if (level == TOTAL_LEVELS) {
+    return INITIAL_ENEMY_HEALTH;
+  }
   return INITIAL_ENEMY_HEALTH + 1 * level;
 }
 export const INITIAL_ENEMY_SPEED = 0.02;
 export const enemySpeed = (level: number) => {
-  return INITIAL_ENEMY_SPEED + 0.001 * level;
+  if (level == TOTAL_LEVELS) {
+    return INITIAL_ENEMY_SPEED;
+  }
+  return INITIAL_ENEMY_SPEED + 0.01 * level;
 }
 export const INITIAL_MAX_ENEMIES = 5;
 export const maxEnemies = (level: number) => {
+  if (level == TOTAL_LEVELS) {
+    return Infinity;
+  }
   return INITIAL_MAX_ENEMIES + 1 * level;
 }
 export const INITIAL_ENEMIES = 10;
 export const enemies = (level: number) => {
+  if (level == TOTAL_LEVELS) {
+    return 3;
+  }
   return INITIAL_ENEMIES + 2 * level;
 }
 
+export const SWORD_DELAY = 80; // ms
 export const SWORD_TIME = 300 // ms
 export const SWORD_COOLDOWN = 400; // ms
 export const SWORD_LENGHT = 1;
 export const SWORD_RANGE = 2 * PLAYER_SIZE.height;
+export const SWORD_CATEGORY = 0x0020;
 
 export const SHOP_POSITION = {
   x: 5,
@@ -95,3 +108,15 @@ export const COIN_SIZE = {
   height: 0.3,
 };
 export const GOLD_PER_ENEMY = 1;
+
+export const TOTAL_LEVELS = 2;
+
+export const BOSS_RADIUS = 2;
+export const BOSS_HEALTH = 30;
+export const BOSS_SPEED = 0.01;
+export const BOSS_GOO_ATTACK_POS = { x: 0, y: 20 };
+
+export const GOO_CATEGORY = 0x0010;
+export const GOO_SPAWN_INTERVAL = 4000; //ms
+export const GOO_SPEED = 0.08;
+export const GOO_TIME = 5000; // ns

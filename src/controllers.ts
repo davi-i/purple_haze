@@ -17,6 +17,7 @@ export const registerUser = async (req: Request, res: Response) => {
   }
 
   try {
+    // Encrypt password
     const salt = await bcrypt.genSalt();
     const hashedPassword = await bcrypt.hash(password, salt);
 

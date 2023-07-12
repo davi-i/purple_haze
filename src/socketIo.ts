@@ -10,8 +10,8 @@ export let io: GameServer;
 export const startSocketIo = () => {
   io = new Server(server);
 
+  // middleware to check if user is logged
   io.use((socket, next) => {
-    console.log('Trying to connect');
     const token = socket.handshake.auth.token;
     if (!token) {
       return next(new Error('Authentication error'));
